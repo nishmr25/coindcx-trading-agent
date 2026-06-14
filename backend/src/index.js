@@ -13,6 +13,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
+
+// Stripe Webhook needs raw body before express.json()
+app.post('/api/wallet/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json());
 
 // Session middleware (required for passport)

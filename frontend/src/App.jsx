@@ -124,20 +124,20 @@ export default function App() {
   }, [token]);
 
   useEffect(() => {
-    // Handle Google Auth Success Redirect
+    // Handle Google Auth Success or Stripe Payment Success
     const urlParams = new URLSearchParams(window.location.search);
     const t = urlParams.get('token');
     if (t) {
       handleLogin(t, { email: urlParams.get('email'), id: urlParams.get('id') });
       window.history.replaceState({}, document.title, "/");
     }
-  }, []);
 
-  useEffect(() => {
-    if (token) fetchUserData();
-    const id = setInterval(() => { if(token) fetchUserData(); }, 10000);
-    return () => clearInterval(id);
-  }, [token, fetchUserData]);
+    if (urlParams.get('success')) {
+      alert("Payment successful! Your balance will update shortly.");
+      window.history.replaceState({}, document.title, "/");
+      fetchUserData();
+    }
+  }, [fetchUserData]);
 
   const handleLogin = (t, u) => {
     setToken(t);
@@ -170,21 +170,22 @@ export default function App() {
 
   const handleDeposit = async () => {
     const amt = prompt("Enter deposit amount (₹):");
-    if (!amt || isNaN(amt)) return;
+    if (!amt || isNaN(amt) || parseFloat(amt) < 100) return alert("Minimum deposit is ₹100");
     try {
-      await axios.post(`${API_BASE}/wallet/deposit`, { amount: amt }, { headers: { Authorization: `Bearer ${token}` } });
-      fetchUserData();
-      alert("Deposit simulated successfully!");
-    } catch (err) { alert("Failed: " + err.message); }
+      const res = await axios.post(`${API_BASE}/wallet/create-checkout-session`, { amount: amt }, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.data.url) {
+        window.location.href = res.data.url;
+      }
+    } catch (err) { alert("Failed to initiate deposit: " + err.message); }
   };
 
   const handleWithdraw = async () => {
     const amt = prompt("Enter withdrawal amount (₹):");
     if (!amt || isNaN(amt)) return;
     try {
-      await axios.post(`${API_BASE}/wallet/withdraw`, { amount: amt }, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.post(`${API_BASE}/wallet/withdraw`, { amount: amt }, { headers: { Authorization: `Bearer ${token}` } });
+      alert(res.data.message || "Withdrawal request submitted!");
       fetchUserData();
-      alert("Withdrawal simulated successfully!");
     } catch (err) { alert(err.response?.data?.message || "Failed"); }
   };
 
