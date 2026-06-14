@@ -8,15 +8,18 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  password     String
-  balance      Float         @default(0.0)
-  totalProfit  Float         @default(0.0)
-  role         String        @default("USER") // USER or ADMIN
-  transactions Transaction[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id               String        @id @default(uuid())
+  email            String        @unique
+  password         String?
+  googleId         String?       @unique
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean       @default(false)
+  balance          Float         @default(0.0)
+  totalProfit      Float         @default(0.0)
+  role             String        @default("USER") // USER or ADMIN
+  transactions     Transaction[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }
 
 model Transaction {
