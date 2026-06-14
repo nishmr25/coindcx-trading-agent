@@ -1,0 +1,963 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+
+// ─── Theme ──────────────────────────────────────────────────────────────────
+const C = {
+  bg:"#050810", panel:"#0b0f1e", card:"#0e1525", border:"#1a2240",
+  accent:"#00f5c4", warn:"#ff6b35", bull:"#00e676",
+  bear:"#ff3d57", muted:"#4a5580", text:"#cdd6f4", textDim:"#6272a4",
+  live:"#00f5c4", paper:"#ff6b35",
+};
+const fmt  = (n,d=2)=>Number(n).toFixed(d);
+const fmtP = (n)=>(n>=0?`+${fmt(n)}%`:`${fmt(n)}%`);
+const usd  = (n)=>`$${Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const ago  = (ms)=>{ const s=Math.floor((Date.now()-ms)/1000); return s<60?`${s}s ago`:`${Math.floor(s/60)}m ago`; };
+
+// ─── CoinDCX HMAC Auth ───────────────────────────────────────────────────────
+async function hmacSHA256(secret, message) {
+  const enc  = new TextEncoder();
+  const key  = await crypto.subtle.importKey("raw", enc.encode(secret),
+    { name:"HMAC", hash:"SHA-256" }, false, ["sign"]);
+  const sig  = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+async function coindcxRequest(path, apiKey, apiSecret, body=null) {
+  const method  = body ? "POST" : "GET";
+  const timeBody = body ? JSON.stringify({ ...body, timestamp: Date.now() }) : null;
+  const signature = timeBody ? await hmacSHA256(apiSecret, timeBody) : null;
+
+  const headers = { "Content-Type":"application/json" };
+  if (apiKey) {
+    headers["X-AUTH-APIKEY"]    = apiKey;
+    headers["X-AUTH-SIGNATURE"] = signature;
+  }
+
+  const res = await fetch(`https://api.coindcx.com${path}`, {
+    method, headers,
+    body: timeBody || undefined,
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(()=>"");
+    throw new Error(`CoinDCX ${res.status}: ${txt.slice(0,200)}`);
+  }
+  return res.json();
+}
+
+// ─── Fetch real balance from CoinDCX ────────────────────────────────────────
+async function fetchBalance(apiKey, apiSecret) {
+  const data = await coindcxRequest("/exchange/v1/users/balances", apiKey, apiSecret, {});
+  // Find USDT balance
+  const usdt = data.find?.(b => b.currency === "USDT" || b.currency === "usdt");
+  if (usdt) return parseFloat(usdt.balance || usdt.available_balance || 0);
+  // Fallback: sum all USDT-like balances
+  const total = (data || []).filter(b=>(b.currency||"").toUpperCase()==="USDT")
+    .reduce((s,b)=>s+parseFloat(b.balance||0), 0);
+  return total;
+}
+
+// ─── Fetch real market tickers from CoinDCX public API ───────────────────────
+async function fetchCoinDCXTickers() {
+  const data = await coindcxRequest("/exchange/ticker", null, null);
+  // data is array of { market, last_price, change_24_hour, high, low, volume, bid, ask }
+  const map = {};
+  (data||[]).forEach(t=>{
+    // Only USDT futures-style pairs
+    if (t.market && t.market.endsWith("USDT")) {
+      const pair = t.market.replace("USDT","") + "/USDT";
+      map[pair] = {
+        pair,
+        price:     fmt(parseFloat(t.last_price||0), parseFloat(t.last_price||0)<1?6:2),
+        priceNum:  parseFloat(t.last_price||0),
+        change24h: fmt(parseFloat(t.change_24_hour||0),2),
+        volume:    fmt(parseFloat(t.volume||0)/1e6, 2),
+        high:      t.high, low: t.low,
+        bid: t.bid, ask: t.ask,
+        // Compute synthetic indicators from price data
+        rsi:       fmt(Math.max(15,Math.min(85, 50 + parseFloat(t.change_24_hour||0)*2)),1),
+        macd:      parseFloat(t.change_24_hour||0)>1?"bullish_cross":
+                   parseFloat(t.change_24_hour||0)<-1?"bearish_cross":"neutral",
+        bbands:    parseFloat(t.change_24_hour||0)>3?"above_upper":
+                   parseFloat(t.change_24_hour||0)<-3?"below_lower":"inside",
+        sentiment: Math.min(90,Math.max(10,50+parseFloat(t.change_24_hour||0)*3)),
+      };
+    }
+  });
+  return map;
+}
+
+// ─── Place real futures order on CoinDCX ────────────────────────────────────
+async function placeFuturesOrder(apiKey, apiSecret, opp, positionSizeUSDT) {
+  // CoinDCX futures order endpoint
+  const symbol = opp.pair.replace("/","_"); // BTC/USDT -> BTC_USDT
+  const side   = opp.signal === "LONG" ? "buy" : "sell";
+
+  const body = {
+    market:        symbol,
+    order_type:    "limit_order",
+    side,
+    price:         String(opp.entry),
+    total_quantity: String(Math.floor(positionSizeUSDT / opp.entry * 100)/100),
+    leverage:      String(opp.leverage),
+    time_in_force: "good_till_cancel",
+    notification_preferences: { trade: false },
+  };
+
+  const data = await coindcxRequest(
+    "/exchange/v1/derivatives/futures/orders/create",
+    apiKey, apiSecret, body
+  );
+
+  return data;
+}
+
+// ─── All known CoinDCX futures pairs ────────────────────────────────────────
+const ALL_PAIRS = [
+  "BTC/USDT","ETH/USDT","BNB/USDT","SOL/USDT","XRP/USDT","ADA/USDT","AVAX/USDT","DOGE/USDT",
+  "DOT/USDT","MATIC/USDT","LTC/USDT","LINK/USDT","UNI/USDT","ATOM/USDT","ETC/USDT","BCH/USDT",
+  "XLM/USDT","NEAR/USDT","FIL/USDT","APT/USDT","ARB/USDT","OP/USDT","SUI/USDT","INJ/USDT",
+  "TIA/USDT","SEI/USDT","JTO/USDT","PYTH/USDT","WIF/USDT","BOME/USDT","PEPE/USDT",
+  "SHIB/USDT","FLOKI/USDT","BONK/USDT","ORDI/USDT","STX/USDT","ENA/USDT","ETHFI/USDT",
+  "NOT/USDT","WLD/USDT","TRX/USDT","TON/USDT","ICP/USDT","HBAR/USDT","VET/USDT",
+  "SAND/USDT","MANA/USDT","AXS/USDT","GALA/USDT","IMX/USDT","ENS/USDT","APE/USDT","CRV/USDT",
+  "AAVE/USDT","MKR/USDT","COMP/USDT","LDO/USDT","GMX/USDT","DYDX/USDT","PENDLE/USDT",
+  "FET/USDT","AGIX/USDT","RENDER/USDT","ARKM/USDT","GMT/USDT","JASMY/USDT","MAGIC/USDT",
+  "SNX/USDT","SUSHI/USDT","1INCH/USDT","RPL/USDT","GNS/USDT","FXS/USDT","CVX/USDT",
+  "BAL/USDT","KNC/USDT","ZRX/USDT","OCEAN/USDT","CFX/USDT","MEME/USDT","BLUR/USDT",
+];
+
+// ─── Simulated ticker fallback ───────────────────────────────────────────────
+const BASE_PRICES = {
+  "BTC/USDT":67450,"ETH/USDT":3820,"BNB/USDT":598,"SOL/USDT":175,"XRP/USDT":0.612,
+  "ADA/USDT":0.485,"AVAX/USDT":38.5,"DOGE/USDT":0.162,"DOT/USDT":8.2,"MATIC/USDT":0.91,
+  "LTC/USDT":89.5,"LINK/USDT":18.4,"UNI/USDT":9.8,"ATOM/USDT":9.1,"ETC/USDT":32.1,
+  "BCH/USDT":478,"XLM/USDT":0.114,"NEAR/USDT":7.3,"FIL/USDT":6.8,"APT/USDT":9.2,
+  "ARB/USDT":1.12,"OP/USDT":2.45,"SUI/USDT":1.87,"INJ/USDT":28.4,"TIA/USDT":11.2,
+  "SEI/USDT":0.52,"JTO/USDT":3.21,"PYTH/USDT":0.42,"WIF/USDT":2.87,
+  "BOME/USDT":0.018,"PEPE/USDT":0.0000132,"SHIB/USDT":0.0000248,"FLOKI/USDT":0.000198,
+  "BONK/USDT":0.0000312,"ORDI/USDT":42.8,"STX/USDT":2.31,"ENA/USDT":0.98,"ETHFI/USDT":3.45,
+  "NOT/USDT":0.0082,"WLD/USDT":5.67,"TRX/USDT":0.127,"TON/USDT":6.89,"ICP/USDT":13.2,
+  "HBAR/USDT":0.113,"VET/USDT":0.038,"SAND/USDT":0.47,"MANA/USDT":0.42,"AXS/USDT":8.9,
+  "GALA/USDT":0.048,"IMX/USDT":2.14,"ENS/USDT":24.7,"APE/USDT":1.32,"CRV/USDT":0.52,
+  "AAVE/USDT":112,"MKR/USDT":2840,"COMP/USDT":58.3,"LDO/USDT":1.87,"GMX/USDT":28.4,
+  "DYDX/USDT":1.92,"PENDLE/USDT":4.38,"FET/USDT":2.31,"AGIX/USDT":0.88,"RENDER/USDT":8.67,
+  "ARKM/USDT":1.78,"MAGIC/USDT":0.82,"GMT/USDT":0.19,"JASMY/USDT":0.018,
+};
+const getBase = p=>BASE_PRICES[p]||(Math.random()*10+0.5);
+
+function genTicker(pair, prevPrice) {
+  const base=getBase(pair), prev=prevPrice||base;
+  const price=Math.max(base*0.7, prev+(Math.random()-0.49)*base*0.004);
+  const d=price<0.0001?8:price<0.01?6:price<1?4:price<100?3:2;
+  const ch=((price-base)/base)*100+(Math.random()-0.5)*3;
+  return {
+    pair, price:fmt(price,d), priceNum:price,
+    change24h:fmt(ch,2),
+    volume:(Math.random()*800+50).toFixed(1),
+    rsi:fmt(Math.max(15,Math.min(85,50+(Math.random()-0.5)*50)),1),
+    macd:["bullish_cross","bearish_cross","neutral"][Math.floor(Math.random()*3)],
+    bbands:["above_upper","inside","below_lower"][Math.floor(Math.random()*3)],
+    sentiment:Math.floor(Math.random()*70+15),
+  };
+}
+
+// ─── Claude multi-coin analysis ──────────────────────────────────────────────
+async function analyseAllCoins(tickers) {
+  const rows = tickers.map(t=>
+    `${t.pair}|${t.price}|${t.change24h}%|RSI:${t.rsi}|${t.macd}|${t.bbands}|VOL:${t.volume}M|SENT:${t.sentiment}`
+  ).join("\n");
+
+  const prompt =
+`You are an elite crypto futures trading analyst. Analyse ALL these coins and find the TOP trading opportunities.
+
+MARKET DATA (pair|price|24hChange|RSI|MACD|BBands|Volume|Sentiment):
+${rows}
+
+Return ONLY a raw JSON object — no markdown, no fences, no commentary:
+{
+  "topOpportunities": [
+    {
+      "pair": "BTC/USDT",
+      "signal": "LONG",
+      "confidence": 78,
+      "leverage": 5,
+      "entry": 67450,
+      "stopLoss": 65800,
+      "takeProfit": 71200,
+      "riskRewardRatio": 2.3,
+      "expectedProfitPct": 5.5,
+      "reasoning": "Strong bullish momentum. MACD bullish cross confirms entry.",
+      "indicators": {"trend":"BULLISH","momentum":"STRONG","volatility":"MEDIUM"},
+      "priority": 1
+    }
+  ],
+  "marketSummary": {
+    "bullishCount": 12,
+    "bearishCount": 8,
+    "neutralCount": 5,
+    "topBullish": ["BTC/USDT","ETH/USDT"],
+    "topBearish": ["XRP/USDT"],
+    "marketMood": "BULLISH"
+  }
+}
+Rules: 5-10 best only. signal=LONG or SHORT. Real stopLoss/takeProfit prices. Return ONLY the JSON.`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true",
+    },
+    body: JSON.stringify({
+      model:"claude-opus-4-5",
+      max_tokens:4096,
+      messages:[{role:"user",content:prompt}],
+    }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Claude API ${res.status}: ${json?.error?.message||JSON.stringify(json)}`);
+
+  const raw = (json.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+  const m   = raw.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error(`No JSON in Claude response: ${raw.slice(0,300)}`);
+
+  let parsed;
+  try { parsed = JSON.parse(m[0]); }
+  catch(e) { throw new Error(`JSON parse: ${e.message}`); }
+
+  if (!Array.isArray(parsed.topOpportunities))
+    throw new Error("Missing topOpportunities in response");
+
+  return parsed;
+}
+
+// ─── Sparkline ───────────────────────────────────────────────────────────────
+function Sparkline({ data, color, width=80, height=26 }) {
+  if (!data||data.length<2) return <div style={{width,height}}/>;
+  const mn=Math.min(...data), range=(Math.max(...data)-mn)||1;
+  const pts=data.map((v,i)=>`${(i/(data.length-1))*width},${height-((v-mn)/range)*height}`).join(" ");
+  return <svg width={width} height={height} style={{overflow:"visible",display:"block"}}>
+    <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
+  </svg>;
+}
+
+// ─── Gauge ───────────────────────────────────────────────────────────────────
+function Gauge({value,label,max=100}) {
+  const r=Math.min(1,Math.max(0,value/max));
+  const col=r>0.7?C.bull:r>0.4?C.accent:C.bear;
+  const circ=2*Math.PI*18;
+  return <div style={{textAlign:"center"}}>
+    <div style={{fontSize:8,color:C.textDim,marginBottom:2}}>{label}</div>
+    <div style={{position:"relative",width:46,height:46,margin:"0 auto"}}>
+      <svg width={46} height={46} style={{transform:"rotate(-90deg)"}}>
+        <circle cx={23} cy={23} r={18} fill="none" stroke={C.border} strokeWidth={4}/>
+        <circle cx={23} cy={23} r={18} fill="none" stroke={col} strokeWidth={4}
+          strokeDasharray={`${r*circ} ${circ}`} strokeLinecap="round"/>
+      </svg>
+      <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
+        justifyContent:"center",color:C.text,fontSize:11,fontWeight:700}}>
+        {Math.round(value)}
+      </div>
+    </div>
+  </div>;
+}
+
+// ─── CoinRow ─────────────────────────────────────────────────────────────────
+function CoinRow({tk,opp,priceHist,onClick,selected}) {
+  const ch=parseFloat(tk?.change24h||0);
+  const chCol=ch>=0?C.bull:C.bear;
+  const sc=!opp?"transparent":opp.signal==="LONG"?C.bull:C.bear;
+  return (
+    <div onClick={onClick} style={{
+      display:"grid",gridTemplateColumns:"115px 95px 65px 55px 55px 68px 82px",
+      padding:"5px 12px",cursor:"pointer",borderBottom:`1px solid ${C.border}22`,
+      background:selected?`${C.accent}0d`:opp?`${sc}07`:"transparent",
+      borderLeft:`2px solid ${opp?sc:"transparent"}`,
+      transition:"background .1s",
+    }}>
+      <div style={{display:"flex",alignItems:"center",gap:5,fontSize:11,fontWeight:700,color:C.text}}>
+        {opp&&<span style={{width:5,height:5,borderRadius:"50%",background:sc,display:"inline-block",flexShrink:0}}/>}
+        {tk?.pair||"—"}
+      </div>
+      <div style={{fontSize:11,color:C.text,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>${tk?.price||"—"}</div>
+      <div style={{fontSize:11,color:chCol,textAlign:"right"}}>{ch>=0?"+":""}{tk?.change24h||"—"}%</div>
+      <div style={{fontSize:11,color:C.textDim,textAlign:"right"}}>{tk?.rsi||"—"}</div>
+      <div style={{fontSize:10,color:opp?sc:C.muted,textAlign:"right",fontWeight:opp?700:400}}>{opp?opp.signal:"—"}</div>
+      <div style={{fontSize:10,color:opp?C.accent:C.muted,textAlign:"right"}}>{opp?`${opp.confidence}%`:"—"}</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"flex-end"}}>
+        <Sparkline data={priceHist} color={chCol} width={70} height={22}/>
+      </div>
+    </div>
+  );
+}
+
+// ─── OppCard ──────────────────────────────────────────────────────────────────
+function OppCard({opp,onTrade,isLive,disabled}) {
+  const sc=opp.signal==="LONG"?C.bull:C.bear;
+  return (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${sc}`,
+      borderRadius:8,padding:"12px 14px",marginBottom:8,fontSize:11}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{background:`${sc}22`,color:sc,padding:"1px 8px",borderRadius:20,fontWeight:700,fontSize:12}}>
+            {opp.signal}
+          </span>
+          <span style={{color:C.text,fontWeight:700,fontSize:13}}>{opp.pair}</span>
+          <span style={{color:C.textDim,fontSize:9}}>#{opp.priority}</span>
+        </div>
+        <button onClick={()=>onTrade(opp)} disabled={disabled}
+          style={{background:sc,color:"#000",border:"none",borderRadius:5,padding:"4px 12px",
+            fontSize:10,fontWeight:700,cursor:"pointer",opacity:disabled?.5:1,
+            boxShadow:isLive?`0 0 8px ${sc}66`:"none"}}>
+          {isLive?"🔴 LIVE EXECUTE":"PAPER EXECUTE"}
+        </button>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-around",marginBottom:10}}>
+        <Gauge value={opp.confidence} label="CONF" max={100}/>
+        <Gauge value={opp.leverage}   label="LEV"  max={20}/>
+        <Gauge value={opp.riskRewardRatio*20} label="R:R×20" max={100}/>
+        <Gauge value={Math.min(100,opp.expectedProfitPct*5)} label="EXP%" max={100}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6,marginBottom:8}}>
+        {[["ENTRY",usd(opp.entry)],["STOP LOSS",usd(opp.stopLoss)],["TAKE PROFIT",usd(opp.takeProfit)]].map(([k,v])=>(
+          <div key={k} style={{background:C.bg,borderRadius:4,padding:"6px 8px",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:8,color:C.textDim}}>{k}</div>
+            <div style={{fontSize:11,fontWeight:700,color:C.text}}>{v}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:12,marginBottom:7,flexWrap:"wrap"}}>
+        {[["TREND",opp.indicators?.trend],["MOM",opp.indicators?.momentum],["VOL",opp.indicators?.volatility],
+          ["EXP PNL",`+${fmt(opp.expectedProfitPct)}%`]].map(([k,v])=>(
+          <div key={k} style={{fontSize:9,color:C.textDim}}>{k}:<span style={{color:C.accent,marginLeft:3}}>{v}</span></div>
+        ))}
+      </div>
+      <div style={{fontSize:10,color:C.textDim,lineHeight:1.5}}>{opp.reasoning}</div>
+    </div>
+  );
+}
+
+// ─── TradeCard ────────────────────────────────────────────────────────────────
+function TradeCard({t}) {
+  const sc=t.signal==="LONG"?C.bull:C.bear;
+  const pnl=parseFloat(t.pnl||0);
+  return (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderLeft:`3px solid ${sc}`,
+      borderRadius:6,padding:"9px 12px",marginBottom:6,fontSize:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <span style={{color:sc,fontWeight:700}}>{t.signal} {t.pair}</span>
+          {t.live && <span style={{background:`${C.bull}22`,color:C.bull,padding:"0 5px",borderRadius:3,fontSize:8,fontWeight:700}}>LIVE</span>}
+          {t.orderId && <span style={{color:C.textDim,fontSize:9}}>#{t.orderId.slice(-8)}</span>}
+        </div>
+        <span style={{color:pnl>=0?C.bull:C.bear,fontWeight:700}}>
+          {t.live?"(open)": (pnl>=0?"+":"")+usd(t.pnl)}
+        </span>
+      </div>
+      <div style={{display:"flex",gap:12,color:C.textDim}}>
+        <span>Entry {usd(t.entry)}</span>
+        <span>SL {usd(t.stopLoss)}</span>
+        <span>TP {usd(t.takeProfit)}</span>
+        <span>Lev {t.leverage}×</span>
+        <span style={{marginLeft:"auto"}}>{t.time}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── API key status badge ─────────────────────────────────────────────────────
+function KeyBadge({status}) {
+  const cfg = {
+    idle:     {col:C.muted,  bg:`${C.muted}22`,  label:"NO KEY"},
+    checking: {col:C.warn,   bg:`${C.warn}22`,   label:"CHECKING…"},
+    valid:    {col:C.bull,   bg:`${C.bull}22`,   label:"🟢 LIVE"},
+    invalid:  {col:C.bear,   bg:`${C.bear}22`,   label:"❌ INVALID"},
+    error:    {col:C.warn,   bg:`${C.warn}22`,   label:"⚠ ERROR"},
+  }[status]||{col:C.muted,bg:`${C.muted}22`,label:"—"};
+  return (
+    <span style={{background:cfg.bg,color:cfg.col,padding:"2px 10px",borderRadius:20,
+      fontSize:10,fontWeight:700,letterSpacing:.5}}>
+      {cfg.label}
+    </span>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// MAIN APP
+// ════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  // ── API keys ──
+  const [apiKey,     setApiKey]     = useState("");
+  const [apiSecret,  setApiSecret]  = useState("");
+  const [keyStatus,  setKeyStatus]  = useState("idle"); // idle|checking|valid|invalid|error
+  const [isLive,     setIsLive]     = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+
+  // ── Market data ──
+  const [tickers,    setTickers]    = useState({});
+  const [priceHists, setPriceHists] = useState({});
+  const tickersRef   = useRef({});
+
+  // ── Scan / analysis ──
+  const [scanResult, setScanResult] = useState(null);
+  const [scanning,   setScanning]   = useState(false);
+  const [autoOn,     setAutoOn]     = useState(false);
+  const [progress,   setProgress]   = useState(0);
+  const [lastScan,   setLastScan]   = useState(null);
+
+  // ── Portfolio ──
+  const [capital,    setCapital]    = useState(10000);
+  const [balance,    setBalance]    = useState(10000);
+  const [liveBalance,setLiveBalance]= useState(null);
+  const [riskPct,    setRiskPct]    = useState(1.5);
+  const [trades,     setTrades]     = useState([]);
+
+  // ── UI ──
+  const [activeTab,  setActiveTab]  = useState("scanner");
+  const [filter,     setFilter]     = useState("ALL");
+  const [sortBy,     setSortBy]     = useState("confidence");
+  const [search,     setSearch]     = useState("");
+  const [selected,   setSelected]   = useState(null);
+  const [log,        setLog]        = useState([]);
+  const [errMsg,     setErrMsg]     = useState("");
+
+  const balRef  = useRef(balance);
+  const riskRef = useRef(riskPct);
+  const autoRef = useRef(autoOn);
+  const liveRef = useRef(isLive);
+  const keyRef  = useRef({ key:"", secret:"" });
+
+  useEffect(()=>{ balRef.current  = balance;  },[balance]);
+  useEffect(()=>{ riskRef.current = riskPct;  },[riskPct]);
+  useEffect(()=>{ autoRef.current = autoOn;   },[autoOn]);
+  useEffect(()=>{ liveRef.current = isLive;   },[isLive]);
+
+  const addLog = useCallback((msg,type="info")=>{
+    setLog(l=>[{t:new Date().toLocaleTimeString(),msg,type},...l].slice(0,120));
+  },[]);
+
+  // ── Init simulated tickers ──────────────────────────────────────────────
+  useEffect(()=>{
+    const init={};
+    ALL_PAIRS.forEach(p=>{ init[p]=genTicker(p,null); });
+    tickersRef.current=init;
+    setTickers({...init});
+
+    // Tick sim every 2.5s (overridden by real data when live)
+    const id=setInterval(()=>{
+      if (liveRef.current) return; // skip sim if live
+      const u={...tickersRef.current};
+      ALL_PAIRS.forEach(p=>{ u[p]=genTicker(p,u[p]?.priceNum); });
+      tickersRef.current=u;
+      setTickers({...u});
+      setPriceHists(prev=>{
+        const n={...prev};
+        ALL_PAIRS.forEach(p=>{ n[p]=[...(n[p]||[]).slice(-39),u[p].priceNum]; });
+        return n;
+      });
+    },2500);
+    return ()=>clearInterval(id);
+  },[]);
+
+  // ── Real market data poll when live ────────────────────────────────────
+  useEffect(()=>{
+    if (!isLive) return;
+    const poll = async ()=>{
+      try {
+        const map = await fetchCoinDCXTickers();
+        const merged={...tickersRef.current};
+        Object.keys(map).forEach(p=>{
+          if (ALL_PAIRS.includes(p)) merged[p]=map[p];
+        });
+        tickersRef.current=merged;
+        setTickers({...merged});
+        setPriceHists(prev=>{
+          const n={...prev};
+          ALL_PAIRS.forEach(p=>{
+            if (merged[p]) n[p]=[...(n[p]||[]).slice(-39),merged[p].priceNum];
+          });
+          return n;
+        });
+      } catch(e) {
+        addLog(`Market data fetch error: ${e.message}`,"warn");
+      }
+    };
+    poll();
+    const id=setInterval(poll,5000);
+    return ()=>clearInterval(id);
+  },[isLive,addLog]);
+
+  // ── Validate API key ────────────────────────────────────────────────────
+  const validateKey = useCallback(async (key, secret)=>{
+    if (!key||!secret) { setKeyStatus("idle"); setIsLive(false); return; }
+    setKeyStatus("checking");
+    addLog("🔑 Validating CoinDCX API key…");
+    try {
+      const bal = await fetchBalance(key, secret);
+      keyRef.current = { key, secret };
+      setKeyStatus("valid");
+      setIsLive(true);
+      setLiveBalance(bal);
+      setBalance(bal);
+      setCapital(bal);
+      balRef.current = bal;
+      addLog(`✅ API key VALID — Live balance: ${usd(bal)} USDT`, "bull");
+      addLog(`🟢 Switched to LIVE TRADING MODE`, "bull");
+    } catch(e) {
+      setKeyStatus("invalid");
+      setIsLive(false);
+      setLiveBalance(null);
+      addLog(`❌ API key invalid: ${e.message}`, "warn");
+    }
+  },[addLog]);
+
+  // Debounce key input → auto-validate after 1s of no typing
+  const keyDebounce = useRef(null);
+  const handleKeyInput = (k, s) => {
+    clearTimeout(keyDebounce.current);
+    if (k && s) {
+      setKeyStatus("checking");
+      keyDebounce.current = setTimeout(()=>validateKey(k,s), 1000);
+    } else {
+      setKeyStatus("idle");
+      setIsLive(false);
+    }
+  };
+
+  // ── Execute trade ───────────────────────────────────────────────────────
+  const executeTrade = useCallback(async (opp)=>{
+    const bal  = balRef.current;
+    const risk = riskRef.current;
+    const live = liveRef.current;
+    const {key,secret} = keyRef.current;
+
+    const posSize = bal * (risk/100) * opp.leverage;
+
+    if (live && key && secret) {
+      // ── LIVE ORDER ──
+      addLog(`🔴 Placing LIVE ${opp.signal} order on ${opp.pair}…`, "bull");
+      try {
+        const order = await placeFuturesOrder(key, secret, opp, posSize);
+        const orderId = order?.id || order?.order_id || "—";
+        addLog(`✅ Live order placed! ID: ${orderId}`, "bull");
+
+        // Refresh balance
+        try {
+          const newBal = await fetchBalance(key,secret);
+          setBalance(newBal); balRef.current=newBal; setLiveBalance(newBal);
+          addLog(`💰 Updated balance: ${usd(newBal)} USDT`);
+        } catch(_){}
+
+        setTrades(ts=>[{
+          ...opp, pair:opp.pair, time:new Date().toLocaleTimeString(),
+          pnl:"0.00", live:true, orderId,
+        },...ts].slice(0,50));
+      } catch(e) {
+        addLog(`❌ Order failed: ${e.message}`, "warn");
+        setErrMsg(`Order failed: ${e.message}`);
+      }
+    } else {
+      // ── PAPER TRADE ──
+      const diff = opp.signal==="LONG"
+        ? (opp.takeProfit-opp.entry)/opp.entry
+        : (opp.entry-opp.takeProfit)/opp.entry;
+      const netPnl = posSize*diff*0.72 - posSize*0.0006;
+      const newBal = Math.max(0, bal+netPnl);
+      setBalance(newBal); balRef.current=newBal;
+      setTrades(ts=>[{
+        ...opp, pair:opp.pair, time:new Date().toLocaleTimeString(),
+        pnl:fmt(netPnl,2), live:false,
+      },...ts].slice(0,50));
+      addLog(`📝 Paper ${opp.signal} ${opp.pair} @ $${opp.entry} | Est PnL ${netPnl>=0?"+":""}${usd(netPnl)}`,
+        netPnl>=0?"bull":"bear");
+    }
+  },[addLog]);
+
+  // ── Scan all coins ──────────────────────────────────────────────────────
+  const scanAll = useCallback(async ()=>{
+    setScanning(true); setErrMsg(""); setProgress(10);
+    addLog(`🔍 Scanning ${ALL_PAIRS.length} pairs…${liveRef.current?" [LIVE DATA]":" [SIM DATA]"}`);
+    try {
+      const snap=Object.values(tickersRef.current).filter(t=>t&&t.pair);
+      setProgress(35);
+      const result=await analyseAllCoins(snap);
+      setProgress(90);
+      setScanResult(result);
+      setLastScan(Date.now());
+
+      const opps=result.topOpportunities||[];
+      const mood=result.marketSummary?.marketMood||"NEUTRAL";
+      addLog(`✅ ${opps.length} opportunities | Market: ${mood}`,
+        mood==="BULLISH"?"bull":mood==="BEARISH"?"bear":"info");
+      opps.slice(0,5).forEach(o=>{
+        addLog(`  #${o.priority} ${o.signal} ${o.pair} | Conf ${o.confidence}% | R:R 1:${fmt(o.riskRewardRatio)} | Exp +${fmt(o.expectedProfitPct)}%`,
+          o.signal==="LONG"?"bull":"bear");
+      });
+
+      // Auto-execute best if confidence ≥ 65
+      if (autoRef.current && opps.length>0 && opps[0].confidence>=65) {
+        await executeTrade(opps[0]);
+      }
+    } catch(e) {
+      console.error(e); setErrMsg(e.message);
+      addLog(`❌ ${e.message}`,"warn");
+    }
+    setProgress(100);
+    setTimeout(()=>setProgress(0),600);
+    setScanning(false);
+  },[addLog,executeTrade]);
+
+  const scanRef=useRef(scanAll);
+  useEffect(()=>{ scanRef.current=scanAll; },[scanAll]);
+
+  useEffect(()=>{
+    if (!autoOn) return;
+    scanRef.current();
+    const id=setInterval(()=>scanRef.current(),30000);
+    return ()=>clearInterval(id);
+  },[autoOn]);
+
+  // ── Derived ─────────────────────────────────────────────────────────────
+  const oppMap={};
+  (scanResult?.topOpportunities||[]).forEach(o=>{ oppMap[o.pair]=o; });
+
+  const displayBalance = isLive && liveBalance!=null ? liveBalance : balance;
+  const pnl    = displayBalance-capital;
+  const pnlPct = ((displayBalance-capital)/capital)*100;
+
+  const filteredPairs=ALL_PAIRS.filter(p=>{
+    if (search&&!p.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filter==="SIGNALS") return !!oppMap[p];
+    if (filter==="LONG")    return oppMap[p]?.signal==="LONG";
+    if (filter==="SHORT")   return oppMap[p]?.signal==="SHORT";
+    return true;
+  });
+
+  const sortedOpps=[...(scanResult?.topOpportunities||[])].sort((a,b)=>{
+    if (sortBy==="confidence") return b.confidence-a.confidence;
+    if (sortBy==="rr")         return b.riskRewardRatio-a.riskRewardRatio;
+    if (sortBy==="profit")     return b.expectedProfitPct-a.expectedProfitPct;
+    return a.priority-b.priority;
+  });
+
+  const summary=scanResult?.marketSummary;
+  const winCount  = trades.filter(t=>!t.live&&parseFloat(t.pnl)>=0).length;
+  const lossCount = trades.filter(t=>!t.live&&parseFloat(t.pnl)<0).length;
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  return (
+    <div style={{background:C.bg,minHeight:"100vh",color:C.text,
+      fontFamily:"'IBM Plex Mono',monospace",boxSizing:"border-box",fontSize:12}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Exo+2:wght@900&display=swap');
+        *{box-sizing:border-box}
+        ::-webkit-scrollbar{width:3px;height:3px}::-webkit-scrollbar-thumb{background:${C.border};border-radius:2px}
+        .btn{cursor:pointer;border:none;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-weight:700;transition:filter .12s,opacity .12s}
+        .btn:hover{filter:brightness(1.18)}.btn:disabled{opacity:.4;cursor:not-allowed}
+        .tab{cursor:pointer;padding:7px 14px;border:none;font-family:inherit;font-size:11px;font-weight:700;transition:all .12s;background:transparent}
+        input,select{background:${C.panel};border:1px solid ${C.border};color:${C.text};border-radius:5px;padding:5px 8px;font-family:inherit;font-size:11px;outline:none}
+        input:focus,select:focus{border-color:${C.accent}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}.pulse{animation:pulse 1.2s infinite}
+        @keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}.fi{animation:fi .25s ease}
+        @keyframes glow{0%,100%{box-shadow:0 0 4px ${C.bull}44}50%{box-shadow:0 0 12px ${C.bull}88}}.glow{animation:glow 2s infinite}
+      `}</style>
+
+      {/* ── HEADER ── */}
+      <div style={{background:C.panel,borderBottom:`1px solid ${C.border}`,padding:"10px 16px",
+        display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <div>
+          <div style={{fontFamily:"'Exo 2',sans-serif",fontSize:18,fontWeight:900,letterSpacing:-0.5,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{color:C.accent}}>APEX</span>
+            <span style={{color:C.text}}>MULTI-SCANNER</span>
+            <KeyBadge status={keyStatus}/>
+            {isLive && <span className="glow" style={{width:8,height:8,borderRadius:"50%",background:C.bull,display:"inline-block"}}/>}
+          </div>
+          <div style={{fontSize:9,color:C.textDim}}>
+            {ALL_PAIRS.length} PAIRS · COINDCX FUTURES · {isLive?"LIVE DATA":"SIMULATED DATA"}
+            {lastScan&&<span style={{marginLeft:8,color:C.muted}}>Last scan: {ago(lastScan)}</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:20,alignItems:"center",flexWrap:"wrap"}}>
+          {summary&&(
+            <div style={{display:"flex",gap:10,fontSize:10}}>
+              <span style={{color:C.bull}}>▲{summary.bullishCount}</span>
+              <span style={{color:C.bear}}>▼{summary.bearishCount}</span>
+              <span style={{color:C.muted}}>—{summary.neutralCount}</span>
+              <span style={{color:summary.marketMood==="BULLISH"?C.bull:summary.marketMood==="BEARISH"?C.bear:C.muted,fontWeight:700}}>
+                {summary.marketMood}
+              </span>
+            </div>
+          )}
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:9,color:isLive?C.bull:C.textDim,marginBottom:1}}>
+              {isLive?"🟢 LIVE BALANCE":"PAPER BALANCE"}
+            </div>
+            <div style={{fontSize:17,fontWeight:700,color:pnl>=0?C.bull:C.bear}}>{usd(displayBalance)}</div>
+            <div style={{fontSize:10,color:pnl>=0?C.bull:C.bear}}>{pnl>=0?"+":""}{usd(pnl)} ({fmtP(pnlPct)})</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── PROGRESS BAR ── */}
+      {scanning&&progress>0&&progress<100&&(
+        <div style={{height:2,background:C.border}}>
+          <div style={{height:2,background:C.accent,width:`${progress}%`,transition:"width .3s"}}/>
+        </div>
+      )}
+
+      {/* ── API KEY CONFIG ── */}
+      <div style={{background:`${C.panel}ee`,borderBottom:`1px solid ${C.border}`,padding:"8px 16px",
+        display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+
+        {/* Live mode indicator */}
+        <div style={{
+          padding:"3px 10px",borderRadius:4,fontSize:10,fontWeight:700,
+          background:isLive?`${C.bull}18`:`${C.warn}18`,
+          border:`1px solid ${isLive?C.bull:C.warn}44`,
+          color:isLive?C.bull:C.warn,
+        }}>
+          {isLive?"🔴 LIVE":"📝 PAPER"}
+        </div>
+
+        <div style={{display:"flex",alignItems:"center",gap:5,flex:1,minWidth:200}}>
+          <span style={{fontSize:9,color:C.textDim,whiteSpace:"nowrap"}}>API KEY</span>
+          <input type="text" placeholder="Enter CoinDCX API key → auto-validates"
+            value={apiKey} style={{flex:1}}
+            onChange={e=>{
+              setApiKey(e.target.value);
+              handleKeyInput(e.target.value, apiSecret);
+            }}/>
+        </div>
+
+        <div style={{display:"flex",alignItems:"center",gap:5,flex:1,minWidth:200}}>
+          <span style={{fontSize:9,color:C.textDim,whiteSpace:"nowrap"}}>SECRET</span>
+          <input type={showSecret?"text":"password"} placeholder="Enter API secret"
+            value={apiSecret} style={{flex:1}}
+            onChange={e=>{
+              setApiSecret(e.target.value);
+              handleKeyInput(apiKey, e.target.value);
+            }}/>
+          <button className="btn" style={{background:C.border,color:C.textDim,padding:"3px 7px",fontSize:9}}
+            onClick={()=>setShowSecret(s=>!s)}>
+            {showSecret?"HIDE":"SHOW"}
+          </button>
+        </div>
+
+        {keyStatus==="valid" && (
+          <button className="btn" style={{background:`${C.bull}22`,color:C.bull,padding:"4px 10px",fontSize:9}}
+            onClick={async()=>{
+              try {
+                const b=await fetchBalance(keyRef.current.key,keyRef.current.secret);
+                setLiveBalance(b); setBalance(b); balRef.current=b;
+                addLog(`💰 Balance refreshed: ${usd(b)} USDT`,"bull");
+              } catch(e){ addLog(`Refresh failed: ${e.message}`,"warn"); }
+            }}>
+            ↻ REFRESH BAL
+          </button>
+        )}
+
+        <div style={{display:"flex",gap:5,alignItems:"center",marginLeft:"auto"}}>
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontSize:9,color:C.textDim}}>RISK%</span>
+            <input type="number" min="0.5" max="10" step="0.5" value={riskPct} style={{width:58}}
+              onChange={e=>setRiskPct(+e.target.value)}/>
+          </div>
+          {!isLive&&(
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <span style={{fontSize:9,color:C.textDim}}>CAP$</span>
+              <input type="number" min="100" step="500" value={capital} style={{width:88}}
+                onChange={e=>{ const v=+e.target.value; setCapital(v); setBalance(v); }}/>
+            </div>
+          )}
+        </div>
+
+        <button className="btn"
+          style={{background:scanning?C.border:C.accent,color:"#000",padding:"6px 14px",fontSize:11}}
+          onClick={scanAll} disabled={scanning}>
+          {scanning?<span className="pulse">Scanning…</span>:`⚡ SCAN ALL`}
+        </button>
+        <button className="btn"
+          style={{background:autoOn?C.bear:C.bull,color:"#000",padding:"6px 12px",fontSize:11}}
+          onClick={()=>{
+            const n=!autoOn; setAutoOn(n);
+            addLog(n?`🤖 Auto ${isLive?"LIVE":"paper"} trade ON (30s)`:"⏹ Auto stopped",n?"bull":"warn");
+          }}>
+          {autoOn?"⏹ STOP":"🤖 AUTO"}
+        </button>
+      </div>
+
+      {/* ── ERROR ── */}
+      {errMsg&&(
+        <div style={{background:`${C.bear}10`,borderBottom:`1px solid ${C.bear}40`,
+          padding:"6px 16px",fontSize:10,color:C.bear,display:"flex",justifyContent:"space-between"}}>
+          <span>❌ {errMsg}</span>
+          <button className="btn" style={{background:"transparent",color:C.bear,padding:"0 6px",fontSize:12}}
+            onClick={()=>setErrMsg("")}>×</button>
+        </div>
+      )}
+
+      {/* ── TABS ── */}
+      <div style={{borderBottom:`1px solid ${C.border}`,padding:"0 16px",display:"flex",gap:2,background:C.panel}}>
+        {[
+          ["scanner",  `📡 SCANNER (${filteredPairs.length}/${ALL_PAIRS.length})`],
+          ["opportunities", `🎯 SIGNALS ${scanResult?`(${sortedOpps.length})`:"(0)"}`],
+          ["trades",   `📋 TRADES (${trades.length})`],
+          ["log",      "📜 LOG"],
+        ].map(([id,label])=>(
+          <button key={id} className="tab"
+            style={{color:activeTab===id?C.accent:C.textDim,
+              borderBottom:activeTab===id?`2px solid ${C.accent}`:"2px solid transparent",
+              borderRadius:0}}
+            onClick={()=>setActiveTab(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ══════════ SCANNER TAB ══════════ */}
+      {activeTab==="scanner"&&(
+        <div style={{padding:"10px 16px"}}>
+          <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+            <input placeholder="Search…" value={search} style={{width:120}}
+              onChange={e=>setSearch(e.target.value)}/>
+            {["ALL","SIGNALS","LONG","SHORT"].map(f=>(
+              <button key={f} className="btn"
+                style={{background:filter===f?C.accent:C.border,color:filter===f?"#000":C.text,
+                  padding:"3px 9px",fontSize:10}}
+                onClick={()=>setFilter(f)}>{f}</button>
+            ))}
+            <span style={{fontSize:9,color:C.textDim}}>{filteredPairs.length} pairs</span>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"115px 95px 65px 55px 55px 68px 82px",
+            padding:"4px 12px",borderBottom:`1px solid ${C.border}`,fontSize:9,color:C.textDim,fontWeight:700}}>
+            <div>PAIR</div><div style={{textAlign:"right"}}>PRICE</div>
+            <div style={{textAlign:"right"}}>24H</div><div style={{textAlign:"right"}}>RSI</div>
+            <div style={{textAlign:"right"}}>SIG</div><div style={{textAlign:"right"}}>CONF</div>
+            <div style={{textAlign:"right"}}>CHART</div>
+          </div>
+
+          <div style={{maxHeight:"calc(100vh - 360px)",overflowY:"auto"}}>
+            {filteredPairs.map(p=>(
+              <CoinRow key={p} tk={tickers[p]} opp={oppMap[p]}
+                priceHist={priceHists[p]||[]} selected={selected===p}
+                onClick={()=>setSelected(selected===p?null:p)}/>
+            ))}
+          </div>
+
+          {selected&&tickers[selected]&&(
+            <div className="fi" style={{marginTop:10,background:C.panel,border:`1px solid ${C.border}`,
+              borderRadius:8,padding:"12px 14px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                <span style={{fontWeight:700,fontSize:13}}>{selected}</span>
+                <button className="btn" style={{background:"transparent",color:C.textDim,fontSize:12,padding:"0 6px"}}
+                  onClick={()=>setSelected(null)}>×</button>
+              </div>
+              {oppMap[selected]
+                ? <OppCard opp={oppMap[selected]} isLive={isLive} onTrade={executeTrade} disabled={scanning}/>
+                : <div style={{color:C.textDim,fontSize:11}}>No signal for {selected} — run a scan first.</div>
+              }
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ SIGNALS TAB ══════════ */}
+      {activeTab==="opportunities"&&(
+        <div style={{padding:"10px 16px"}}>
+          {!scanResult?(
+            <div style={{textAlign:"center",padding:"40px 20px"}}>
+              <div style={{fontSize:32,marginBottom:10}}>🔍</div>
+              <div style={{color:C.textDim,fontSize:12,marginBottom:14}}>
+                No scan yet. Click SCAN ALL to find opportunities across all {ALL_PAIRS.length} pairs.
+              </div>
+              <button className="btn" style={{background:C.accent,color:"#000",padding:"9px 22px",fontSize:12}}
+                onClick={scanAll} disabled={scanning}>
+                {scanning?<span className="pulse">Scanning…</span>:`⚡ Scan All ${ALL_PAIRS.length} Pairs`}
+              </button>
+            </div>
+          ):(
+            <>
+              <div style={{display:"flex",gap:6,marginBottom:10,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:9,color:C.textDim}}>Sort:</span>
+                {[["confidence","Confidence"],["rr","R:R"],["profit","Exp%"],["priority","Priority"]].map(([k,l])=>(
+                  <button key={k} className="btn"
+                    style={{background:sortBy===k?C.accent:C.border,color:sortBy===k?"#000":C.text,
+                      padding:"3px 8px",fontSize:10}}
+                    onClick={()=>setSortBy(k)}>{l}</button>
+                ))}
+                {isLive&&<span style={{marginLeft:4,color:C.bull,fontSize:10,fontWeight:700}}>🔴 LIVE EXECUTION ON</span>}
+              </div>
+              <div style={{maxHeight:"calc(100vh - 280px)",overflowY:"auto"}}>
+                {sortedOpps.length===0
+                  ? <div style={{color:C.textDim,fontSize:11,textAlign:"center",padding:20}}>No opportunities found.</div>
+                  : sortedOpps.map((o,i)=>(
+                    <OppCard key={i} opp={o} isLive={isLive} onTrade={executeTrade} disabled={scanning}/>
+                  ))
+                }
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ TRADES TAB ══════════ */}
+      {activeTab==="trades"&&(
+        <div style={{padding:"10px 16px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
+            <span style={{fontSize:11,color:C.accent,fontWeight:700}}>TRADE HISTORY</span>
+            <div style={{display:"flex",gap:14,fontSize:10}}>
+              <span style={{color:C.bull}}>W: {winCount}</span>
+              <span style={{color:C.bear}}>L: {lossCount}</span>
+              {winCount+lossCount>0&&(
+                <span style={{color:C.accent}}>
+                  WR: {fmt((winCount/(winCount+lossCount))*100)}%
+                </span>
+              )}
+              <span style={{color:pnl>=0?C.bull:C.bear,fontWeight:700}}>
+                Net: {pnl>=0?"+":""}{usd(pnl)}
+              </span>
+            </div>
+          </div>
+          <div style={{maxHeight:"calc(100vh - 240px)",overflowY:"auto"}}>
+            {trades.length===0
+              ? <div style={{textAlign:"center",padding:"40px 20px",color:C.textDim,fontSize:11}}>
+                  No trades yet. Scan and execute opportunities.
+                </div>
+              : trades.map((t,i)=><TradeCard key={i} t={t}/>)
+            }
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ LOG TAB ══════════ */}
+      {activeTab==="log"&&(
+        <div style={{padding:"10px 16px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+            <span style={{fontSize:11,color:C.accent,fontWeight:700}}>ACTIVITY LOG</span>
+            <button className="btn" style={{background:C.border,color:C.textDim,padding:"2px 7px",fontSize:9}}
+              onClick={()=>setLog([])}>CLEAR</button>
+          </div>
+          <div style={{maxHeight:"calc(100vh - 230px)",overflowY:"auto",background:C.panel,
+            border:`1px solid ${C.border}`,borderRadius:7,padding:"9px 11px"}}>
+            {log.length===0
+              ? <div style={{color:C.textDim,fontSize:10}}>No activity yet.</div>
+              : log.map((l,i)=>(
+                <div key={i} style={{fontSize:10,lineHeight:1.9,
+                  color:l.type==="bull"?C.bull:l.type==="bear"?C.bear:l.type==="warn"?C.warn:C.textDim}}>
+                  <span style={{color:C.muted}}>{l.t} </span>{l.msg}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+
+      <div style={{textAlign:"center",padding:"8px",fontSize:9,color:C.muted,borderTop:`1px solid ${C.border}`}}>
+        APEX · {isLive?"🔴 LIVE TRADING":"📝 PAPER MODE"} · Claude AI · Not financial advice · Trade at your own risk
+      </div>
+    </div>
+  );
+}

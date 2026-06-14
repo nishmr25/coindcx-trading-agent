@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "coindcx": {
+      "type": "http",
+      "url": "http://localhost:4000/mcp",
+      "headers": {
+        "Authorization": "Bearer cbc9c75aa4361b3fa372e01e54115bccd53b35ecabc30306"
+      }
+    },
+    "coindcx-http": {
+      "type": "http",
+      "url": "http://localhost:4001/mcp"
+    }
+  }
+}
