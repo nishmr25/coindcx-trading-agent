@@ -8,7 +8,7 @@ const C = {
   bear:"#ff3d57", muted:"#4a5580", text:"#cdd6f4", textDim:"#6272a4",
 };
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const inr = (n) => `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 const fmt = (n, d = 2) => Number(n).toFixed(d);
