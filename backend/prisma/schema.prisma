@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  password     String
+  balance      Float         @default(0.0)
+  totalProfit  Float         @default(0.0)
+  role         String        @default("USER") // USER or ADMIN
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Transaction {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // DEPOSIT, WITHDRAWAL
+  amount    Float
+  status    String   @default("COMPLETED") // PENDING, COMPLETED, FAILED
+  timestamp DateTime @default(now())
+}
+
+model Trade {
+  id              String   @id @default(uuid())
+  pair            String
+  signal          String   // LONG, SHORT
+  entry           Float
+  exit            Float?
+  leverage        Int
+  pnl             Float    @default(0.0)
+  commissionTaken Float    @default(0.0)
+  status          String   @default("CLOSED") // OPEN, CLOSED
+  timestamp       DateTime @default(now())
+}
