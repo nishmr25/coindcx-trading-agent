@@ -109,4 +109,4 @@ const getBalance = async (req, res) => {
   }
 };
 
-module.exports = { deposit, withdraw, getBalance };
+module.exports = { createCheckoutSession, handleStripeWebhook, withdraw, getBalance };
