@@ -478,8 +478,27 @@ export default function App() {
     setScanResult(result);
     setLastScan(Date.now());
     addLog(`✅ Found ${result.topOpportunities.length} signals`, "bull");
+    
+    // Auto-trade logic
+    if (autoRef.current && result.topOpportunities.length > 0) {
+      const best = result.topOpportunities[0];
+      if (best.confidence >= 75) {
+        addLog(`🤖 Auto-executing #${best.priority} ${best.pair} (${best.confidence}% confidence)`, "bull");
+        await executeTrade(best);
+      }
+    }
+    
     setScanning(false);
-  },[allPairs, addLog]);
+  },[allPairs, addLog, executeTrade]);
+
+  const scanRef = useRef(scanAll);
+  useEffect(()=>{ scanRef.current = scanAll; },[scanAll]);
+
+  useEffect(()=>{
+    if (!autoOn) return;
+    const id = setInterval(()=>scanRef.current(), 30000); // Scan every 30s in auto mode
+    return ()=>clearInterval(id);
+  },[autoOn]);
 
   const oppMap=useMemo(()=>{
     const m={};
@@ -528,6 +547,13 @@ export default function App() {
         <input type="password" placeholder="Secret" value={apiSecret} onChange={e=>setApiSecret(e.target.value)} style={{flex:1}}/>
         <button className="btn" style={{background:C.bull,color:"#000"}} onClick={()=>validateKey(apiKey,apiSecret)}>{keyStatus==="checking"?"...":"CONNECT"}</button>
         <button className="btn" style={{background:C.accent,color:"#000"}} onClick={scanAll} disabled={scanning}>SCAN ALL</button>
+        <button className="btn" style={{background:autoOn?C.bear:C.bull,color:"#000"}} 
+          onClick={()=>{
+            const n=!autoOn; setAutoOn(n);
+            addLog(n?`🤖 AUTO TRADE ON (Every 30s)` : "⏹ AUTO STOPPED", n?"bull":"warn");
+          }}>
+          {autoOn?"STOP AUTO":"AUTO TRADE"}
+        </button>
       </div>
 
       {/* TABS */}
