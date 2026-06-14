@@ -41,9 +41,11 @@ function FloatingCore() {
   const mesh = useRef();
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
-    mesh.current.rotation.x = Math.cos(t / 4) / 8;
-    mesh.current.rotation.y = Math.sin(t / 4) / 8;
-    mesh.current.position.y = Math.sin(t / 2) / 10;
+    if (mesh.current) {
+      mesh.current.rotation.x = Math.cos(t / 4) / 8;
+      mesh.current.rotation.y = Math.sin(t / 4) / 8;
+      mesh.current.position.y = Math.sin(t / 2) / 10;
+    }
   });
 
   return (
@@ -322,7 +324,7 @@ export default function App() {
 
           <AnimatePresence mode="wait">
             {activeTab === "wallet" && (
-              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px" }}>
+              <motion.div key="wallet" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px" }}>
                 <GlassPanel style={{ padding: "30px" }}>
                   <h3 style={{ color: C.accent, marginBottom: "20px", fontSize: "14px" }}>WALLET_CONTROLS</h3>
                   <div style={{ display: "flex", gap: "15px", marginBottom: "30px" }}>
@@ -358,7 +360,7 @@ export default function App() {
             )}
 
             {activeTab === "performance" && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <motion.div key="perf" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <GlassPanel style={{ padding: "40px", textAlign: "center" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "40px" }}>
                     <div>
@@ -379,7 +381,7 @@ export default function App() {
             )}
 
             {activeTab === "fund-trades" && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+              <motion.div key="fund" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
                 <GlassPanel style={{ padding: "30px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 2fr 1.5fr", padding: "0 10px 15px", borderBottom: `1px solid ${C.border}`, color: C.textDim, fontSize: "10px" }}>
                     <span>IDENTIFIER</span><span>SIDE</span><span>ENTRY</span><span>PNL_GROSS</span><span>TIME</span>
@@ -400,7 +402,7 @@ export default function App() {
             )}
 
             {activeTab === "settings" && (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
+              <motion.div key="set" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
                 <GlassPanel style={{ padding: "40px", maxWidth: "600px", margin: "0 auto" }}>
                   <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "30px" }}>
                     <Shield size={32} color={C.accent} />
@@ -414,8 +416,10 @@ export default function App() {
                         <div style={{ fontSize: "11px", color: C.textDim }}>ENABLE TOTP LAYER FOR WITHDRAWALS</div>
                       </div>
                       <NeonButton onClick={async () => {
-                        const res = await axios.get(`${API_BASE}/auth/2fa/generate`, { headers: { Authorization: `Bearer ${token}` } });
-                        setQrCode(res.data.qrCodeUrl);
+                        try {
+                          const res = await axios.get(`${API_BASE}/auth/2fa/generate`, { headers: { Authorization: `Bearer ${token}` } });
+                          setQrCode(res.data.qrCodeUrl);
+                        } catch(e) { alert("2FA_GEN_FAILED"); }
                       }}>ACTIVATE</NeonButton>
                     </div>
                   ) : (
