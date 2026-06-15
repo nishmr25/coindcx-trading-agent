@@ -1,0 +1,585 @@
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+CoinDCX Error (/exchange/ticker): getaddrinfo ENOTFOUND api.coindcx.com
+Trading Engine Iteration Error: CoinDCX API Error
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
+Trading Engine Iteration Error: 
+Invalid `prisma.user.findMany()` invocation in
+D:\coindcx trading agent\backend\src\services\tradingService.js:77:35
+
+  74 
+  75 async function executePooledTrade(opportunity) {
+  76   // 1. Calculate pooled capital
+→ 77   const users = await prisma.user.findMany(
+Can't reach database server at `localhost:5432`
+
+Please make sure your database server is running at `localhost:5432`.
