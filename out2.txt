@@ -1,0 +1,4 @@
+🚀 Trading Engine Started (Pooled Fund)
+Server running on port 5000 
+[2026-06-23T10:47:06.901Z] GET /api/wallet/balance
+[2026-06-23T10:47:07.125Z] GET /api/trades
