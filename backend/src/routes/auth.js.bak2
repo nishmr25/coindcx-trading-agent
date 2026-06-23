@@ -1,4 +1,4 @@
-﻿// Disable all login methods as requested
+/** Disable all login methods as requested
 const express = require('express');
 const passport = require('passport');
 // const { register, login, verify2FA, generate2FA, enable2FA, googleCallback } = require('../controllers/authController');

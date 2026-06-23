@@ -3,11 +3,11 @@ const { createCheckoutSession, handleStripeWebhook, withdraw, getBalance } = req
 const { protect } = require('../middleware/auth');
 const router = express.Router();
 
-router.get('/balance', protect, getBalance);
-router.post('/withdraw', protect, withdraw);
+router.get('/balance', getBalance);
+router.post('/withdraw', withdraw);
 
 // Stripe Deposits
-router.post('/create-checkout-session', protect, createCheckoutSession);
+router.post('/create-checkout-session', createCheckoutSession);
 
 // Stripe Webhook (Parser handled in index.js)
 router.post('/webhook', handleStripeWebhook);

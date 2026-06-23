@@ -1,0 +1,19 @@
+const express = require('express');
+const passport = require('passport');
+const { register, login, verify2FA, generate2FA, enable2FA, googleCallback } = require('../controllers/authController');
+const { protect } = require('../middleware/auth');
+const router = express.Router();
+
+router.post('/register', register);
+router.post('/login', login);
+router.post('/login/verify-2fa', verify2FA);
+
+// 2FA Routes
+router.get('/2fa/generate', protect, generate2FA);
+router.post('/2fa/enable', protect, enable2FA);
+
+// Google OAuth
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/login' }), googleCallback);
+
+module.exports = router;
