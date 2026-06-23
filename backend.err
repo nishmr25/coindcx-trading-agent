@@ -1,0 +1,17 @@
+D:\coindcx-trading-agent\backend\src\controllers\walletController.js:17
+  const url = \`https://api.coindcx.com\${path}\`;
+              ^
+
+SyntaxError: Invalid or unexpected token
+    at wrapSafe (node:internal/modules/cjs/loader:1787:18)
+    at Module._compile (node:internal/modules/cjs/loader:1828:20)
+    at Object..js (node:internal/modules/cjs/loader:1985:10)
+    at Module.load (node:internal/modules/cjs/loader:1577:32)
+    at Module._load (node:internal/modules/cjs/loader:1379:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1600:12)
+    at require (node:internal/modules/helpers:153:16)
+    at Object.<anonymous> (D:\coindcx-trading-agent\backend\src\routes\wallet.js:2:24)
+    at Module._compile (node:internal/modules/cjs/loader:1854:14)
+
+Node.js v24.17.0

@@ -1,3 +1,4 @@
+﻿// Trading service for executing trades on CoinDCX Futures
 const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
 const crypto = require('crypto');
@@ -38,8 +39,56 @@ async function coindcxRequest(path, body = null) {
   }
 }
 
-// ─── Ported Logic ───────────────────────────────────────────────────────────
+// Fetch futures balances for INR and USDT wallets
+async function getFuturesBalances() {
+  try {
+    const data = await coindcxRequest('/futures/balances');
+    const balances = {};
+    (data || []).forEach(item => {
+      if (item.currency) {
+        balances[item.currency.toUpperCase()] = parseFloat(item.balance) || 0;
+      }
+    });
+    return balances;
+  } catch (err) {
+    console.error('Failed to fetch futures balances:', err.message);
+    return { INR: 0, USDT: 0 };
+  }
+}
 
+// Get ticker price for a given market (e.g., BTCINR)
+async function getTicker(market) {
+  try {
+    const data = await coindcxRequest('/exchange/ticker');
+    const ticker = (data || []).find(t => t.market === market);
+    return ticker ? parseFloat(ticker.last_price) : 0;
+  } catch (err) {
+    console.error(`Failed to fetch ticker for ${market}:`, err.message);
+    return 0;
+  }
+}
+
+// Place a futures market order
+async function placeFuturesOrder(pair, side, quantity) {
+  try {
+    // Note: Adjust quantity formatting according to contract specifications if needed
+    const order = {
+      pair: pair,
+      side: side.toLowerCase(),
+      order_type: 'market',
+      quantity: quantity.toString(),
+      // leverage can be added if needed
+    };
+    const result = await coindcxRequest('/futures/place_order', order);
+    console.log(`Order placed successfully: ${JSON.stringify(result)}`);
+    return result;
+  } catch (err) {
+    console.error('Failed to place order:', err.message);
+    throw err;
+  }
+}
+
+// Trading pairs we consider
 const ALL_PAIRS = [
   "BTC/INR","ETH/INR","BNB/INR","SOL/INR","XRP/INR","ADA/INR","AVAX/INR","DOGE/INR"
 ];
@@ -48,7 +97,7 @@ async function fetchTickers() {
   const data = await coindcxRequest('/exchange/ticker');
   const map = {};
   (data || []).forEach(t => {
-    if (t.market && t.market.endsWith('INR')) {
+    if (t.market && t.marker.endsWith('INR')) {
       const pair = t.market.replace('INR', '') + '/INR';
       if (ALL_PAIRS.includes(pair)) {
         map[pair] = {
@@ -67,67 +116,58 @@ async function fetchTickers() {
 function analyseMarket(tickers) {
   return tickers.map(t => {
     const bullScore = 50 + (t.change24h * 5);
-    const signal = bullScore > 65 ? 'LONG' : bullScore < 35 ? 'SHORT' : null;
+    const signal = bullScore > 65 ? 'LONG' : (bullScore < 35 ? 'SHORT' : null);
     return { ...t, signal, confidence: Math.round(bullScore) };
   }).filter(s => s.signal).sort((a, b) => b.confidence - a.confidence);
 }
 
 async function executePooledTrade(opportunity) {
-  // 1. Calculate pooled capital
-  const users = await prisma.user.findMany({ where: { balance: { gt: 0 } } });
-  const totalPool = users.reduce((sum, u) => sum + u.balance, 0);
-
-  if (totalPool < 100) return; // Minimum pool size
-
-  console.log(`🤖 Executing trade for pool: ${opportunity.pair} | Total: ₹${totalPool}`);
-
-  // 2. Real trade execution (Master Account)
-  // For safety in this environment, we will mock the PnL realization
-  const risk = 0.05; // 5% of pool
-  const leverage = 5;
-  const positionSize = totalPool * risk * leverage;
-
-  // In a real app, you'd call placeFuturesOrder here.
-  // We'll simulate a trade outcome for this demo.
-  const outcome = Math.random() > 0.4 ? 0.05 : -0.03; // 60% win rate
-  const grossPnL = positionSize * outcome;
-  
-  let commission = 0;
-  let netPnL = grossPnL;
-
-  if (grossPnL > 0) {
-    commission = grossPnL * 0.30;
-    netPnL = grossPnL - commission;
-  }
-
-  // 3. Distribute PnL to users
-  for (const user of users) {
-    const userShare = user.balance / totalPool;
-    const userPnL = netPnL * userShare;
+  try {
+    // Get futures balances
+    const balances = await getFuturesBalances();
+    const inrBalance = balances.INR || 0;
+    const usdtBalance = balances.USDT || 0;
+    // Convert USDT to INR using ticker
+    const usdtInrRate = await getTicker('USDTINR');
+    const totalBalanceInr = Math.round((inrBalance + (usdtBalance * usdtInrRate)) * 100) / 100;
     
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        balance: { increment: userPnL },
-        totalProfit: { increment: userPnL > 0 ? userPnL : 0 }
-      }
-    });
-  }
-
-  // 4. Record trade
-  await prisma.trade.create({
-    data: {
-      pair: opportunity.pair,
-      signal: opportunity.signal,
-      entry: opportunity.price,
-      leverage: leverage,
-      pnl: grossPnL,
-      commissionTaken: commission,
-      status: 'CLOSED'
+    if (totalBalanceInr < 100) {
+      console.log('Insufficient balance to trade (minimum 100 INR required).');
+      return;
     }
-  });
 
-  console.log(`✅ Trade Closed. Pool PnL: ₹${netPnL.toFixed(2)} | Commission: ₹${commission.toFixed(2)}`);
+    // Risk percentage per trade (e.g., 10% of balance)
+    const riskPercent = 0.10;
+    const riskAmountInr = totalBalanceInr * riskPercent;
+    
+    // Calculate quantity based on opportunity price
+    const opportunityPrice = opportunity.price; // In INR per unit of base asset
+    if (opportunityPrice <= 0) {
+      console.log('Invalid opportunity price.');
+      return;
+    }
+    const quantity = riskAmountInr / opportunityPrice; // Amount of base currency (e.g., BTC)
+    
+    // Determine side based on signal
+    const side = opportunity.signal === 'LONG' ? 'BUY' : 'SELL';
+    const pair = opportunity.pair; // e.g., "BTC/INR"
+    
+    console.log(`\n--- Executing Trade ---`);
+    console.log(`Pair: ${pair}`);
+    console.log(`Signal: ${opportunity.signal} (confidence: ${opportunity.confidence}%)`);
+    console.log(`Total Balance: ₹${totalBalanceInr.toFixed(2)}`);
+    console.log(`Risk Amount: ₹${riskAmountInr.toFixed(2)} (${riskPercent*100}%)`);
+    console.log(`Quantity: ${quantity.toFixed(6)} ${pair.split('/')[0]}`);
+    console.log(`Side: ${side}`);
+    console.log(`Price: ₹${opportunityPrice.toFixed(2)}`);
+    console.log('----------------------\n');
+
+    // Place the order via CoinDCX Futures API
+    const orderResult = await placeFuturesOrder(pair, side, quantity);
+    console.log('Trade executed via CoinDCX API.');
+  } catch (err) {
+    console.error('Error executing trade:', err.message);
+  }
 }
 
 let isRunning = false;
@@ -135,7 +175,7 @@ let isRunning = false;
 const start = () => {
   if (isRunning) return;
   isRunning = true;
-  console.log('🚀 Trading Engine Started (Pooled Fund)');
+  console.log('🚀 Trading Engine Started (Live Futures Trading)');
 
   setInterval(async () => {
     try {

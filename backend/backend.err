@@ -1,0 +1,4 @@
+CoinDCX Error (/futures/balances): 
+Failed to fetch futures balances: CoinDCX API Error
+CoinDCX Error (/exchange/ticker): 
+Failed to fetch ticker for USDTINR: CoinDCX API Error
